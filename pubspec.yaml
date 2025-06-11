@@ -1,0 +1,47 @@
+name: event_collab
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  firebase_auth: ^5.3.4
+  google_sign_in: ^6.2.2
+  firebase_core: ^3.9.0
+  cloud_firestore: ^5.6.5
+  cloudinary_public: ^0.21.0
+  image_picker: ^0.8.7+3
+  intl: ^0.17.0
+  fl_chart: ^0.70.2
+  path_provider: ^2.1.1
+  share_plus: ^7.0.2
+  excel: ^2.0.1
+  csv: ^5.0.3
+  url_launcher: ^6.1.10
+  cached_network_image: ^3.2.3
+  http: ^0.13.5
+  http_parser: ^4.0.2
+  path: ^1.8.0
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/logo48.png
