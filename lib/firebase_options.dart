@@ -14,3 +14,80 @@ import 'package:flutter/foundation.dart'
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
 /// ```
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    if (kIsWeb) {
+      return web;
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        return ios;
+      case TargetPlatform.macOS:
+        return macos;
+      case TargetPlatform.windows:
+        return windows;
+      case TargetPlatform.linux:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for linux - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
+      default:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
+    }
+  }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDE05uq3GbVTis50yViMGzZweCYKGekepM',
+    appId: '1:464434457561:web:b48796f9d539eb952647c8',
+    messagingSenderId: '464434457561',
+    projectId: 'event-collab-e7743',
+    authDomain: 'event-collab-e7743.firebaseapp.com',
+    storageBucket: 'event-collab-e7743.firebasestorage.app',
+    measurementId: 'G-M92GJ21BKP',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyBXsRa5pE7YkxoLCwRF0jgq0fLnLdeosQo',
+    appId: '1:464434457561:android:f31c73f3731b8eff2647c8',
+    messagingSenderId: '464434457561',
+    projectId: 'event-collab-e7743',
+    storageBucket: 'event-collab-e7743.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyAZrT9ozOYJ3QLKChFR4c8tPKb72t_fOlc',
+    appId: '1:464434457561:ios:4be5da857947fcd72647c8',
+    messagingSenderId: '464434457561',
+    projectId: 'event-collab-e7743',
+    storageBucket: 'event-collab-e7743.firebasestorage.app',
+    androidClientId: '464434457561-hpgfe1ru6creoik35cthbdk45udcvn19.apps.googleusercontent.com',
+    iosClientId: '464434457561-ag31qs513ct95mdhb7telhnrfn9rpdi1.apps.googleusercontent.com',
+    iosBundleId: 'com.example.eventCollab',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAZrT9ozOYJ3QLKChFR4c8tPKb72t_fOlc',
+    appId: '1:464434457561:ios:4be5da857947fcd72647c8',
+    messagingSenderId: '464434457561',
+    projectId: 'event-collab-e7743',
+    storageBucket: 'event-collab-e7743.firebasestorage.app',
+    androidClientId: '464434457561-hpgfe1ru6creoik35cthbdk45udcvn19.apps.googleusercontent.com',
+    iosClientId: '464434457561-ag31qs513ct95mdhb7telhnrfn9rpdi1.apps.googleusercontent.com',
+    iosBundleId: 'com.example.eventCollab',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyDE05uq3GbVTis50yViMGzZweCYKGekepM',
+    appId: '1:464434457561:web:4c13d7a83ff0a83c2647c8',
+    messagingSenderId: '464434457561',
+    projectId: 'event-collab-e7743',
+    authDomain: 'event-collab-e7743.firebaseapp.com',
+    storageBucket: 'event-collab-e7743.firebasestorage.app',
+    measurementId: 'G-G2NX9N15BP',
+  );
+
+}

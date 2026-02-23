@@ -7,6 +7,7 @@ class HuggingFaceService {
   static const String _baseUrl = 'https://api-inference.huggingface.co/models';
   static const String _chatModel = 'microsoft/DialoGPT-medium';
   static const String _textModel = 'google/flan-t5-base';
+  static const String _embeddingModel = 'sentence-transformers/all-MiniLM-L6-v2';
 
   final String apiToken;
   final http.Client _client = http.Client();
@@ -123,58 +124,70 @@ class HuggingFaceService {
     return null;
   }
 
-  /// Generate event recommendations based on user preferences
-  Future<String?> getEventRecommendations({
-    required List<Map<String, dynamic>> availableEvents,
-    String? userPreference,
-    String? userRole,
-  }) async {
-    if (availableEvents.isEmpty) return null;
-
+  /// Vector embeddings for semantic similarity (used in recommendations).
+  /// Returns null if API fails or token is invalid.
+  Future<List<double>?> getEmbedding(String text) async {
+    if (text.trim().isEmpty) return null;
     try {
-      final eventsSummary = availableEvents.take(15).map((e) {
-        final name = e['name'] ?? 'Unknown';
-        final type = e['type'] ?? '';
-        final loc = e['location'] ?? (type == 'online' ? 'Online' : '');
-        final descRaw = (e['description'] ?? '').toString();
-        final desc = descRaw.length > 80 ? '${descRaw.substring(0, 80)}...' : descRaw;
-        return '- $name ($type${loc.isNotEmpty ? ", $loc" : ""}): $desc';
-      }).join('\n');
-
-      final prompt = 'Given these events:\n$eventsSummary\n\n'
-          '${userPreference != null && userPreference.isNotEmpty ? "User preference: $userPreference. " : ""}'
-          '${userRole != null && userRole.isNotEmpty ? "User role: $userRole. " : ""}'
-          'Recommend top 3-5 events that would be most relevant. '
-          'Reply with a short list of event names and one line why each is recommended.';
-
       final response = await _client.post(
-        Uri.parse('$_baseUrl/$_textModel'),
+        Uri.parse('$_baseUrl/$_embeddingModel'),
         headers: {
           'Authorization': 'Bearer $apiToken',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'inputs': prompt,
-          'parameters': {
-            'max_new_tokens': 200,
-            'temperature': 0.7,
-          },
-        }),
+        body: jsonEncode({'inputs': text.trim()}),
       );
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
+        List<dynamic>? vec;
         if (decoded is List && decoded.isNotEmpty) {
-          return decoded[0]['generated_text']?.toString().trim();
+          if (decoded[0] is List) {
+            vec = decoded[0] as List;
+          } else {
+            vec = decoded as List;
+          }
         }
-        if (decoded is Map && decoded['generated_text'] != null) {
-          return decoded['generated_text'].toString().trim();
+        if (vec != null) {
+          return List<double>.from(vec.map((e) => (e as num).toDouble()));
         }
-      } else if (response.statusCode == 503) {
-        return null;
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Batch embeddings for multiple texts (API accepts array of strings).
+  Future<List<List<double>?>> getEmbeddings(List<String> texts) async {
+    final filtered = texts.where((t) => t.trim().isNotEmpty).toList();
+    if (filtered.isEmpty) return List.filled(texts.length, null);
+
+    try {
+      final response = await _client.post(
+        Uri.parse('$_baseUrl/$_embeddingModel'),
+        headers: {
+          'Authorization': 'Bearer $apiToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'inputs': filtered}),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          final results = <List<double>?>[];
+          for (var i = 0; i < decoded.length; i++) {
+            final item = decoded[i];
+            if (item is List) {
+              results.add(List<double>.from(item.map((e) => (e as num).toDouble())));
+            } else {
+              results.add(null);
+            }
+          }
+          return results;
+        }
+      }
+    } catch (_) {}
+    return List.filled(filtered.length, null);
   }
 
   void dispose() {

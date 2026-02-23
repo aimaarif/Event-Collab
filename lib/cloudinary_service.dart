@@ -11,7 +11,7 @@ class CloudinaryService {
 
   void initialize() {
     // Replace with your actual Cloudinary credentials
-    _cloudinary = CloudinaryPublic('', '', cache: false);
+    _cloudinary = CloudinaryPublic('djmes6yky', 'ec_preset', cache: false);
   }
 
   Future<String?> uploadImage(File imageFile) async {

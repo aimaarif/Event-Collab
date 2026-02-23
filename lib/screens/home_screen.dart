@@ -8,6 +8,7 @@ import 'package:event_collab/screens/profile_page.dart';
 import 'package:event_collab/screens/event_detail_page.dart';
 import 'package:event_collab/screens/ai_chatbot_screen.dart';
 import 'package:event_collab/services/huggingface_service.dart';
+import 'package:event_collab/services/recommendation_engine.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -20,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isProcessingDeletion = false;
   bool _aiRecommendationsExpanded = false;
-  String? _aiRecommendationsText;
+  List<RecommendedEvent>? _aiRecommendations;
   bool _aiRecommendationsLoading = false;
 
   @override
@@ -408,13 +409,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   final eventMaps = events.map((d) => d.data() as Map<String, dynamic>).toList();
+                  final eventIds = events.map((d) => d.id).toList();
 
                   return ListView.builder(
                     padding: EdgeInsets.all(8),
                     itemCount: events.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return _buildAiRecommendationsCard(context, eventMaps);
+                        return _buildAiRecommendationsCard(context, eventMaps, eventIds);
                       }
                       final event = events[index - 1].data() as Map<String, dynamic>;
                       final documentId = events[index - 1].id;
@@ -450,37 +452,54 @@ class _HomeScreenState extends State<HomeScreen> {
         .snapshots();
   }
 
-  Future<void> _fetchAiRecommendations(List<Map<String, dynamic>> events) async {
-    if (huggingFaceApiToken.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Add HF_TOKEN to get AI recommendations')),
-      );
-      return;
-    }
+  Future<void> _fetchAiRecommendations(
+    List<Map<String, dynamic>> events,
+    List<String> eventIds,
+  ) async {
     setState(() => _aiRecommendationsLoading = true);
     String? userRole;
+    String? userId;
     try {
       final user = _auth.currentUser;
       if (user != null) {
+        userId = user.uid;
         final doc = await _firestore.collection('users').doc(user.uid).get();
         userRole = doc.data()?['role'];
       }
     } catch (_) {}
-    final service = HuggingFaceService(apiToken: huggingFaceApiToken);
-    final result = await service.getEventRecommendations(
-      availableEvents: events,
-      userRole: userRole,
+
+    final hfService = huggingFaceApiToken.isNotEmpty
+        ? HuggingFaceService(apiToken: huggingFaceApiToken)
+        : null;
+
+    final engine = RecommendationEngine(
+      firestore: _firestore,
+      huggingFaceService: hfService,
     );
-    service.dispose();
+
+    final results = await engine.getRecommendations(
+      events: events,
+      eventIds: eventIds,
+      userId: userId,
+      userRole: userRole,
+      topK: 5,
+    );
+
+    hfService?.dispose();
+
     if (mounted) {
       setState(() {
         _aiRecommendationsLoading = false;
-        _aiRecommendationsText = result;
+        _aiRecommendations = results;
       });
     }
   }
 
-  Widget _buildAiRecommendationsCard(BuildContext context, List<Map<String, dynamic>> events) {
+  Widget _buildAiRecommendationsCard(
+    BuildContext context,
+    List<Map<String, dynamic>> events,
+    List<String> eventIds,
+  ) {
     return Card(
       margin: EdgeInsets.only(bottom: 8),
       elevation: 2,
@@ -489,8 +508,10 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           setState(() => _aiRecommendationsExpanded = !_aiRecommendationsExpanded);
-          if (_aiRecommendationsExpanded && _aiRecommendationsText == null && !_aiRecommendationsLoading) {
-            _fetchAiRecommendations(events);
+          if (_aiRecommendationsExpanded &&
+              _aiRecommendations == null &&
+              !_aiRecommendationsLoading) {
+            _fetchAiRecommendations(events, eventIds);
           }
         },
         child: Padding(
@@ -518,6 +539,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               if (_aiRecommendationsExpanded) ...[
+                SizedBox(height: 8),
+                Text(
+                  'Uses: Collaborative filtering • Content-based • Vector embeddings',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
                 SizedBox(height: 12),
                 if (_aiRecommendationsLoading)
                   Center(
@@ -527,26 +553,67 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           CircularProgressIndicator(),
                           SizedBox(height: 8),
-                          Text('Getting recommendations...', style: TextStyle(color: Colors.grey[600])),
+                          Text(
+                            'Analyzing with 3 AI techniques...',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
                         ],
                       ),
                     ),
                   )
-                else if (_aiRecommendationsText != null)
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.purple[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _aiRecommendationsText!,
-                      style: TextStyle(fontSize: 14, height: 1.4),
-                    ),
+                else if (_aiRecommendations != null && _aiRecommendations!.isNotEmpty)
+                  Column(
+                    children: _aiRecommendations!.map((rec) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => EventDetailPage(eventId: rec.eventId),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.purple[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.purple[100]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  rec.event['name'] ?? 'Event',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Colors.purple[900],
+                                  ),
+                                ),
+                                if (rec.reason != null) ...[
+                                  SizedBox(height: 4),
+                                  Text(
+                                    rec.reason!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.purple[700],
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   )
-                else if (huggingFaceApiToken.isEmpty)
+                else if (_aiRecommendations != null && _aiRecommendations!.isEmpty)
                   Text(
-                    'Add HF_TOKEN (--dart-define=HF_TOKEN=xxx) for AI recommendations.',
+                    'No recommendations yet. Apply to events to build your profile!',
                     style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   )
                 else
