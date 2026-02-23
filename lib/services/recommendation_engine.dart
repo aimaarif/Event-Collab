@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:event_collab/services/huggingface_service.dart';
 
@@ -45,7 +46,7 @@ class RecommendationEngine {
       normB += b[i] * b[i];
     }
     if (normA == 0 || normB == 0) return 0;
-    return dot / (normA.sqrt() * normB.sqrt());
+    return dot / (sqrt(normA) * sqrt(normB));
   }
 
   /// Content-based similarity: Jaccard for tags, type match, location/description overlap.
