@@ -6,6 +6,8 @@ import 'dart:io';
 import '../cloudinary_service.dart';
 import 'package:intl/intl.dart';
 import 'package:event_collab/screens/home_screen.dart';
+import 'package:event_collab/config/api_config.dart';
+import 'package:event_collab/services/huggingface_service.dart';
 
 class AddEventPage extends StatefulWidget {
   final String? eventId;
@@ -23,6 +25,7 @@ class AddEventPage extends StatefulWidget {
 
 class _AddEventPageState extends State<AddEventPage> {
   final _formKey = GlobalKey<FormState>();
+  final _descriptionController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final CloudinaryService _cloudinaryService = CloudinaryService();
@@ -53,6 +56,7 @@ class _AddEventPageState extends State<AddEventPage> {
   final List<String> _lookingForOptions = ['Sponsor', 'Vendor', 'Volunteer'];
 
   bool _isLoading = false;
+  bool _isGeneratingDescription = false;
 
   @override
   void initState() {
@@ -62,6 +66,7 @@ class _AddEventPageState extends State<AddEventPage> {
     if (widget.initialEventData != null) {
       _eventName = widget.initialEventData!['name'] ?? '';
       _description = widget.initialEventData!['description'] ?? '';
+      _descriptionController.text = _description;
       _eventType = widget.initialEventData!['type'] ?? 'online';
       _location = widget.initialEventData!['location'];
       _totalTickets = widget.initialEventData!['totalTickets'] ?? 0;
@@ -87,6 +92,47 @@ class _AddEventPageState extends State<AddEventPage> {
       if (widget.initialEventData!['endTime'] != null) {
         final parts = widget.initialEventData!['endTime'].split(':');
         _endTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generateAiDescription() async {
+    if (huggingFaceApiToken.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Add HF_TOKEN for AI description. Run with --dart-define=HF_TOKEN=your_token')),
+      );
+      return;
+    }
+    if (_eventName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Enter event name first')),
+      );
+      return;
+    }
+    setState(() => _isGeneratingDescription = true);
+    final service = HuggingFaceService(apiToken: huggingFaceApiToken);
+    final result = await service.generateEventDescription(
+      eventName: _eventName,
+      eventType: _eventType,
+      location: _eventType == 'onsite' ? _location : null,
+      lookingFor: _lookingFor.isNotEmpty ? _lookingFor : null,
+    );
+    service.dispose();
+    if (mounted) {
+      setState(() => _isGeneratingDescription = false);
+      if (result != null && result.isNotEmpty) {
+        _descriptionController.text = result;
+        _description = result;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not generate. Model may be loading. Try again.')),
+        );
       }
     }
   }
@@ -383,21 +429,49 @@ class _AddEventPageState extends State<AddEventPage> {
               ),
               SizedBox(height: 16),
 
-              // Description
-              TextFormField(
-                initialValue: _description,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter description';
-                  }
-                  return null;
-                },
-                onSaved: (value) => _description = value!,
+              // Description with AI generate
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter description';
+                        }
+                        return null;
+                      },
+                      onSaved: (value) => _description = value ?? _descriptionController.text,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Column(
+                    children: [
+                      IconButton(
+                        onPressed: _isGeneratingDescription ? null : _generateAiDescription,
+                        icon: _isGeneratingDescription
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(Icons.auto_awesome),
+                        tooltip: 'Generate with AI',
+                        color: Colors.purple[700],
+                      ),
+                      Text(
+                        'AI',
+                        style: TextStyle(fontSize: 10, color: Colors.purple[700]),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               SizedBox(height: 16),
 
