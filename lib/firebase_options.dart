@@ -41,7 +41,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDE05uq3GbVTis50yViMGzZweCYKGekepM',
+    apiKey: 'API_key',
     appId: '1:464434457561:web:b48796f9d539eb952647c8',
     messagingSenderId: '464434457561',
     projectId: 'event-collab-e7743',
